@@ -1,0 +1,283 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Prime Distrubution</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+
+		<script src="vendor/three.js/Three.js"></script>
+		<script src="vendor/three.js/Detector.js"></script>
+		<!-- https://github.com/mrdoob/stats.js -->
+		<script src="vendor/three.js/Stats.js"></script>
+
+		<script src="vendor/threex/THREEx.screenshot.js"></script>
+		<script src="vendor/threex/THREEx.FullScreen.js"></script>
+		<script src="vendor/threex/THREEx.WindowResize.js"></script>
+		<script src="vendor/threex.dragpancontrols.js"></script>
+
+		<link  href="css/main.css" rel="stylesheet"/>
+	</head>
+<body>
+    	<div id="container"></div>
+	<div id="info">
+		<div class="bottom" id="inlineDoc" >
+			- <i>p</i> for screenshot
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		var stats, scene, renderer, composer;
+		var camera, cameraControl;
+
+
+      var Pyramid = function () {
+        this.frame = {
+          width: 500,
+          height: 500
+        };
+        this.base = 2.0;
+        this.Ce = 1.0;
+        this.points = [];
+        this.vectors = [];
+        this.max = 40.0;
+        this.level = 3.0;
+      }
+
+
+      Pyramid.prototype.objects = function (name, obj) {
+        this.objects[name] = obj;
+      };
+
+      Pyramid.prototype.AddPoint = function (point) {
+        this.points.add(point);
+      };
+
+      Pyramid.prototype.getPoint = function (index) {
+        return this.points[index];
+      };
+
+      Pyramid.prototype.setBounds = function (b) {
+        this.bounds = b;
+      };
+
+      Pyramid.prototype.getBounds = function () {
+        return this.bounds;
+      };
+
+      Pyramid.prototype.setFrame = function (f) {
+        this.frame = f;
+      };
+
+      Pyramid.prototype.getFrame = function () {
+        return this.frame;
+      };
+
+      Pyramid.prototype.getLowerBound = function (z) {
+          if (z < 2) throw new Error("Cannot get expansion rate for values less than two!");
+          return (1.0/z) * ((z < 0) ? -1 : 1) ;
+      };
+
+      Pyramid.prototype.getUpperBound = function (z) {
+          if (z < 2) throw new Error("Cannot get expansion rate for values less than two!");
+          return (1 - this.getLowerBound(z));
+      };
+
+      Pyramid.prototype.getSpan = function (z) {
+        return (this.getUpperBound(z) - this.getLowerBound(z));
+      };
+
+      Pyramid.prototype.getExpansion = function (z) {
+        return (this.getSpan(z) - this.getSpan(z-1));
+      };
+
+      Pyramid.prototype.getExpansionRate = function (z) {
+        return (this.Ce)*(this.getExpansion(z) / this.getSpan(z));
+      };
+
+      Pyramid.prototype.getZ = function (z) {
+        return 0;
+      };
+
+      Pyramid.prototype.nextLevel = function (caller, cb) {
+        _this = this;
+        var val = _this.level;
+        _this.level += 1;
+        _this.buildLevel(val);
+        if (_this.level < _this.max) {
+          _this.nextLevel(caller, cb);
+        } else if (_this.level === this.max) {
+          cb.call(caller);
+        }
+      };
+
+      Pyramid.prototype.buildLevel = function (k) {
+        var x = this.getSpan(k);
+        var y = this.getExpansion(k);
+
+        var rectShape = new THREE.Shape();
+        var rectShape2 = new THREE.Shape();
+
+        rectShape.moveTo( 0, 0 );
+        rectShape.lineTo( 0, x );
+        rectShape.lineTo( y, x );
+        rectShape.lineTo( y, 0 );
+        rectShape.lineTo( 0, 0 );
+
+        rectShape2.moveTo( 0, 0 );
+        rectShape2.lineTo( x, 0 );
+        rectShape2.lineTo( x, y );
+        rectShape2.lineTo( 0, y );
+        rectShape2.lineTo( 0, 0 );
+
+        var rectGeom = new THREE.ShapeGeometry( rectShape );
+        var rectGeom2 = new THREE.ShapeGeometry( rectShape2 );
+
+        var rectMesh = new THREE.Mesh( rectGeom, new THREE.MeshBasicMaterial( {
+            color: 0x000000
+        }));
+        var rectMesh2 = new THREE.Mesh( rectGeom2, new THREE.MeshBasicMaterial( {
+            color: 0x0000ff
+        }));
+
+        scene.add(rectMesh);
+            scene.add(rectMesh2);
+      };
+
+      var pyramid = new Pyramid();
+
+
+		if( !init() )	animate();
+
+
+
+		// init the scene
+		function init(){
+
+			if( Detector.webgl ){
+				renderer = new THREE.WebGLRenderer({
+					antialias		: true,	// to get smoother output
+					preserveDrawingBuffer	: true	// to allow screenshot
+				});
+				renderer.setClearColor( 0xbbbbbb );
+			}else{
+				Detector.addGetWebGLMessage();
+				return true;
+			}
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.getElementById('container').appendChild(renderer.domElement);
+
+			// add Stats.js - https://github.com/mrdoob/stats.js
+			stats = new Stats();
+			stats.domElement.style.position	= 'absolute';
+			stats.domElement.style.bottom	= '0px';
+			document.body.appendChild( stats.domElement );
+
+			// create a scene
+			scene = new THREE.Scene();
+
+			// put a camera in the scene
+			camera	= new THREE.PerspectiveCamera(15, window.innerWidth / window.innerHeight, 1, 10000 );
+			camera.position.set(0, 0, 5);
+			scene.add(camera);
+
+			// create a camera contol
+			cameraControls	= new THREEx.DragPanControls(camera)
+
+			// transparently support window resize
+			THREEx.WindowResize.bind(renderer, camera);
+			// allow 'p' to make screenshot
+			THREEx.Screenshot.bindKey(renderer);
+			// allow 'f' to go fullscreen where this feature is supported
+			if( THREEx.FullScreen.available() ){
+				THREEx.FullScreen.bindKey();
+				document.getElementById('inlineDoc').innerHTML	+= "- <i>f</i> for fullscreen";
+			}
+
+			// here you add your objects
+			// - you will most likely replace this part by your own
+			var light	= new THREE.AmbientLight( Math.random() * 0xffffff );
+			scene.add( light );
+			var light	= new THREE.DirectionalLight( Math.random() * 0xffffff );
+			light.position.set( Math.random(), Math.random(), Math.random() ).normalize();
+			scene.add( light );
+			var light	= new THREE.DirectionalLight( Math.random() * 0xffffff );
+			light.position.set( Math.random(), Math.random(), Math.random() ).normalize();
+			scene.add( light );
+			var light	= new THREE.DirectionalLight( Math.random() * 0xffffff );
+			light.position.set( Math.random(), Math.random(), Math.random() ).normalize();
+			scene.add( light );
+			var light	= new THREE.PointLight( Math.random() * 0xffffff );
+			light.position.set( Math.random()-0.5, Math.random()-0.5, Math.random()-0.5 )
+						.normalize().multiplyScalar(1.2);
+			scene.add( light );
+			var light	= new THREE.PointLight( Math.random() * 0xffffff );
+			light.position.set( Math.random()-0.5, Math.random()-0.5, Math.random()-0.5 )
+						.normalize().multiplyScalar(1.2);
+			scene.add( light );
+			var light	= new THREE.PointLight( Math.random() * 0xffffff );
+			light.position.set( Math.random()-0.5, Math.random()-0.5, Math.random()-0.5 )
+						.normalize().multiplyScalar(1.2);
+			scene.add( light );
+
+			var geometry	= new THREE.Geometry();
+
+			var _this = this;
+ 			pyramid.nextLevel(_this, function(){
+ 					console.log("Done!")
+        });
+
+ 		}
+
+
+
+
+
+		// animation loop
+		function animate() {
+
+			// loop on request animation loop
+			// - it has to be at the begining of the function
+			// - see details at http://my.opera.com/emoller/blog/2011/12/20/requestanimationframe-for-smart-er-animating
+			requestAnimationFrame( animate );
+
+			// do the render
+			render();
+
+			// update stats
+			stats.update();
+		}
+
+		// render the scene
+		function render() {
+			// variable which is increase by Math.PI every seconds - usefull for animation
+			var PIseconds	= Date.now() * Math.PI;
+
+			// update camera controls
+			cameraControls.update();
+
+			// animation of all objects
+			scene.traverse(function(object3d, i){
+				if( object3d instanceof THREE.Mesh === false )	return
+				//object3d.rotation.y = PIseconds*0.0003 * (i % 2 ? 1 : -1);
+				//object3d.rotation.x = PIseconds*0.0002 * (i % 2 ? 1 : -1);
+			})
+			// animate DirectionalLight
+			scene.traverse(function(object3d, idx){
+				if( object3d instanceof THREE.DirectionalLight === false )	return
+				var ang	= 0.0005 * PIseconds * (idx % 2 ? 1 : -1);
+				object3d.position.set(Math.cos(ang), Math.sin(ang), Math.cos(ang*2)).normalize();
+			})
+			// animate PointLights
+			scene.traverse(function(object3d, idx){
+				if( object3d instanceof THREE.PointLight === false )	return
+				var angle	= 0.0005 * PIseconds * (idx % 2 ? 1 : -1) + idx * Math.PI/3;
+				object3d.position.set(Math.cos(angle)*3, Math.sin(angle*3)*2, Math.cos(angle*2)).normalize().multiplyScalar(2);
+			})
+
+			// actually render the scene
+			renderer.render( scene, camera );
+		}
+	</script>
+</body>
+</html>
