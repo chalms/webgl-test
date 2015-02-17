@@ -161,6 +161,13 @@
         addCamera();
         addControls();
         addScene();
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Pass your JSON models into this function
+// 
+//  But this function needs to be re-organized to use less object instantiation
+//   
+
         addModel({
           type: "mesh",
           geometry: {
@@ -175,6 +182,11 @@
             }
           }
         });
+
+
+//
+
+
         addLighting();
         addRenderer();
         addStats();
